@@ -28,47 +28,74 @@
     <div id="app-container" style="display: none;">
         <div class="sidebar">
             <div class="user-info">
-                <span id="my-username"></span>
-                <button onclick="logout()">Çıkış</button>
+                <span id="my-username">Yükleniyor...</span>
+                <button onclick="logout()">Çıkış Yap</button>
             </div>
-            <h3>Aktif Kullanıcılar</h3>
-            <ul id="user-list">
-                <!-- Kullanıcılar buraya gelecek -->
-            </ul>
+            <div class="sidebar-tabs">
+                <button id="tab-common" class="tab-btn active" onclick="showCommonChat()">Ortak Chat</button>
+                <button id="tab-private" class="tab-btn" onclick="showPrivateList()">Özel Mesajlar</button>
+            </div>
+            <div id="common-tab-content" class="tab-content">
+                <div class="common-chat-preview" onclick="showCommonChatFull()">
+                    <div class="preview-icon">🌍</div>
+                    <div class="preview-text">
+                        <strong>Ortak Chat Odası</strong>
+                        <p>Herkesle konuşmaya başla</p>
+                    </div>
+                </div>
+            </div>
+            <div id="private-tab-content" class="tab-content" style="display: none;">
+                <h3>Sohbetler</h3>
+                <ul id="user-list"></ul>
+            </div>
         </div>
+
         <div class="chat-area">
-            <div class="common-chat">
+            <!-- Common Chat Full Screen -->
+            <div id="common-chat-full" class="chat-view" style="display: none;">
                 <div class="chat-header">
-                    <span>Ortak Chat</span>
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <button class="back-btn" onclick="hideChatView()">←</button>
+                        <span>Ortak Chat</span>
+                    </div>
                 </div>
                 <div id="common-messages" class="messages-container"></div>
                 <div class="input-group">
                     <label for="common-image-input" class="icon-btn">📷</label>
-                    <input type="file" id="common-image-input" accept="image/*" style="display: none;">
-                    <button id="common-record-btn" class="icon-btn">🎤</button>
+                    <input type="file" id="common-image-input" accept="image/*" style="display: none;" onchange="handleImage(event, false)">
+                    <button id="common-record-btn" class="icon-btn" onclick="toggleRecord(false)">🎤</button>
                     <input type="text" id="common-input" placeholder="Mesaj yaz...">
                     <button class="send-btn" onclick="sendCommon()">Gönder</button>
                 </div>
             </div>
-            <div class="private-chat">
+
+            <!-- Private Chat View -->
+            <div id="private-chat-view" class="chat-view" style="display: none;">
                 <div class="chat-header">
                     <div style="display: flex; align-items: center; gap: 10px;">
-                        <button class="back-btn" onclick="toggleSidebar()">←</button>
-                        <span id="private-header">Özel Mesajlar</span>
+                        <button class="back-btn" onclick="hideChatView()">←</button>
+                        <span id="private-header">Kullanıcı Seçin</span>
                     </div>
-                    <div id="call-controls" style="display: none;">
+                    <div id="call-controls" style="display: none; display: flex; gap: 10px;">
+                        <button id="private-search-btn" class="icon-btn" onclick="openSearch()">🔍</button>
                         <button id="start-call-btn" class="icon-btn" onclick="startCall()" title="Sesli Ara">📞</button>
                     </div>
                 </div>
                 <div id="private-messages" class="messages-container"></div>
                 <div class="input-group">
-                    <button id="private-search-btn" class="icon-btn" onclick="openSearch()" disabled>🔍</button>
                     <label for="private-image-input" class="icon-btn">📷</label>
-                    <input type="file" id="private-image-input" accept="image/*" style="display: none;" disabled>
-                    <button id="private-record-btn" class="icon-btn" disabled>🎤</button>
-                    <input type="text" id="private-input" placeholder="Mesaj yaz..." disabled>
-                    <button id="private-btn" class="send-btn" onclick="sendPrivate()" disabled>Gönder</button>
+                    <input type="file" id="private-image-input" accept="image/*" style="display: none;" onchange="handleImage(event, true)">
+                    <button id="private-record-btn" class="icon-btn" onclick="toggleRecord(true)">🎤</button>
+                    <input type="text" id="private-input" placeholder="Mesaj yaz...">
+                    <button id="private-btn" class="send-btn" onclick="sendPrivate()">Gönder</button>
                 </div>
+            </div>
+
+            <!-- Welcome Screen -->
+            <div id="welcome-screen" class="chat-view" style="display: flex; justify-content: center; align-items: center; flex-direction: column; color: var(--text-secondary);">
+                <div style="font-size: 64px; margin-bottom: 20px;">💬</div>
+                <h2>16GnG Sohbet'e Hoş Geldin</h2>
+                <p>Mesajlaşmaya başlamak için bir sohbet seçin.</p>
             </div>
         </div>
     </div>

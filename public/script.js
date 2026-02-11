@@ -153,11 +153,6 @@ function selectUser(user) {
     selectedUser = user;
     unreadCounts[user] = 0;
     document.getElementById('private-header').textContent = user;
-    document.getElementById('private-input').disabled = false;
-    document.getElementById('private-btn').disabled = false;
-    document.getElementById('private-image-input').disabled = false;
-    document.getElementById('private-record-btn').disabled = false;
-    document.getElementById('private-search-btn').disabled = false;
     
     // UI Update
     document.querySelectorAll('#user-list li').forEach(li => {
@@ -169,16 +164,54 @@ function selectUser(user) {
         }
     });
     
-    // Mobile: Hide sidebar when user selected
+    // Show Private Chat View
+    document.getElementById('welcome-screen').style.display = 'none';
+    document.getElementById('common-chat-full').style.display = 'none';
+    document.getElementById('private-chat-view').style.display = 'flex';
+    document.getElementById('call-controls').style.display = 'flex';
+    
+    // Mobile: Toggle sidebar
     if (window.innerWidth <= 768) {
         toggleSidebar();
     }
     
     socket.emit('markAsSeen', user);
     socket.emit('loadPrivateMessages', user);
+}
+
+// Navigation Functions
+function showCommonChat() {
+    document.getElementById('tab-common').classList.add('active');
+    document.getElementById('tab-private').classList.remove('active');
+    document.getElementById('common-tab-content').style.display = 'block';
+    document.getElementById('private-tab-content').style.display = 'none';
+}
+
+function showPrivateList() {
+    document.getElementById('tab-common').classList.remove('active');
+    document.getElementById('tab-private').classList.add('active');
+    document.getElementById('common-tab-content').style.display = 'none';
+    document.getElementById('private-tab-content').style.display = 'block';
+}
+
+function showCommonChatFull() {
+    document.getElementById('welcome-screen').style.display = 'none';
+    document.getElementById('private-chat-view').style.display = 'none';
+    document.getElementById('common-chat-full').style.display = 'flex';
     
-    // Call controls
-    document.getElementById('call-controls').style.display = 'block';
+    if (window.innerWidth <= 768) {
+        toggleSidebar();
+    }
+}
+
+function hideChatView() {
+    document.getElementById('welcome-screen').style.display = 'flex';
+    document.getElementById('private-chat-view').style.display = 'none';
+    document.getElementById('common-chat-full').style.display = 'none';
+    
+    if (window.innerWidth <= 768) {
+        toggleSidebar();
+    }
 }
 
 // WebRTC Functions
