@@ -3,6 +3,7 @@ let currentUser = null;
 let selectedUser = null;
 let mediaRecorder = null;
 let audioChunks = [];
+let unreadCounts = {}; // username -> count
 
 // Auth Functions
 function showRegister() {
@@ -81,6 +82,7 @@ socket.on('updateUserList', (users) => {
         const li = document.createElement('li');
         li.textContent = user;
         if (selectedUser === user) li.classList.add('active');
+        if (unreadCounts[user]) li.classList.add('has-unread');
         li.onclick = () => selectUser(user);
         list.appendChild(li);
     });
@@ -99,8 +101,28 @@ socket.on('loadCommonMessages', (messages) => {
 socket.on('privateMessage', (msg) => {
     if (selectedUser === msg.from || selectedUser === msg.to) {
         appendMessage('private-messages', msg);
+        if (selectedUser === msg.from) {
+            socket.emit('markAsSeen', msg.from);
+        }
+    } else {
+        // Bildirim ver
+        unreadCounts[msg.from] = (unreadCounts[msg.from] || 0) + 1;
+        updateSidebar();
     }
 });
+
+socket.on('messagesSeen', (byUser) => {
+    if (selectedUser === byUser) {
+        document.querySelectorAll('.seen-tick').forEach(tick => {
+            tick.classList.add('seen');
+            tick.textContent = '✓✓';
+        });
+    }
+});
+
+function updateSidebar() {
+    socket.emit('authenticate', currentUser); // Listeyi tetikle
+}
 
 socket.on('loadPrivateMessages', ({ otherUser, messages }) => {
     if (selectedUser === otherUser) {
@@ -113,6 +135,7 @@ socket.on('loadPrivateMessages', ({ otherUser, messages }) => {
 // Helper Functions
 function selectUser(user) {
     selectedUser = user;
+    unreadCounts[user] = 0;
     document.getElementById('private-header').textContent = `Özel Mesajlar: ${user}`;
     document.getElementById('private-input').disabled = false;
     document.getElementById('private-btn').disabled = false;
@@ -121,9 +144,15 @@ function selectUser(user) {
     
     // UI Update
     document.querySelectorAll('#user-list li').forEach(li => {
-        li.classList.toggle('active', li.textContent === user);
+        if (li.textContent === user) {
+            li.classList.add('active');
+            li.classList.remove('has-unread');
+        } else {
+            li.classList.remove('active');
+        }
     });
     
+    socket.emit('markAsSeen', user);
     socket.emit('loadPrivateMessages', user);
 }
 
@@ -162,7 +191,13 @@ function appendMessage(containerId, msg) {
     } else if (msg.type === 'audio') {
         contentHtml += `<audio controls src="${msg.content}"></audio>`;
     } else {
-        contentHtml += msg.text || msg; // msg.text fallback for old messages
+        contentHtml += msg.text || (typeof msg === 'string' ? msg : ''); 
+    }
+
+    if (containerId === 'private-messages' && isSent) {
+        const tickClass = msg.seen ? 'seen-tick seen' : 'seen-tick';
+        const tickText = msg.seen ? '✓✓' : '✓';
+        contentHtml += `<span class="${tickClass}">${tickText}</span>`;
     }
     
     div.innerHTML = contentHtml;

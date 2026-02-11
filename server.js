@@ -115,7 +115,8 @@ io.on('connection', (socket) => {
         let messageData = {
             from: currentUser,
             to: msg.to,
-            timestamp: Date.now()
+            timestamp: Date.now(),
+            seen: false
         };
 
         if (msg.type === 'image' || msg.type === 'audio') {
@@ -126,14 +127,30 @@ io.on('connection', (socket) => {
             messageData.type = 'text';
         }
 
-        await messagesDB.insert(messageData);
+        const insertedMsg = await messagesDB.insert(messageData);
         
         // Alıcıya ve gönderene gönder
         const recipientSocketId = [...activeUsers.entries()].find(([id, name]) => name === msg.to)?.[0];
         if (recipientSocketId) {
-            io.to(recipientSocketId).emit('privateMessage', messageData);
+            io.to(recipientSocketId).emit('privateMessage', insertedMsg);
         }
-        socket.emit('privateMessage', messageData);
+        socket.emit('privateMessage', insertedMsg);
+    });
+
+    // Mesaj Görüldü İşaretle
+    socket.on('markAsSeen', async (otherUser) => {
+        if (!currentUser) return;
+        await messagesDB.update(
+            { from: otherUser, to: currentUser, seen: false },
+            { $set: { seen: true } },
+            { multi: true }
+        );
+        
+        // Gönderene görüldü bilgisini ilet
+        const senderSocketId = [...activeUsers.entries()].find(([id, name]) => name === otherUser)?.[0];
+        if (senderSocketId) {
+            io.to(senderSocketId).emit('messagesSeen', currentUser);
+        }
     });
 
     // Özel Mesaj Geçmişini Yükle

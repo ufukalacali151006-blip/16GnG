@@ -252,6 +252,22 @@ body {
     50% { opacity: 0.5; }
 }
 
+#user-list li.has-unread {
+    background: #e1f5fe;
+    font-weight: bold;
+}
+
+.seen-tick {
+    font-size: 10px;
+    margin-left: 5px;
+    opacity: 0.5;
+}
+
+.seen-tick.seen {
+    opacity: 1;
+    color: #0095f6;
+}
+
 .input-group button:disabled {
     color: #b2dffc;
 }
