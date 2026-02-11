@@ -52,11 +52,17 @@
             </div>
             <div class="private-chat">
                 <div class="chat-header">
-                    <button class="back-btn" onclick="toggleSidebar()">←</button>
-                    <span id="private-header">Özel Mesajlar</span>
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <button class="back-btn" onclick="toggleSidebar()">←</button>
+                        <span id="private-header">Özel Mesajlar</span>
+                    </div>
+                    <div id="call-controls" style="display: none;">
+                        <button id="start-call-btn" class="icon-btn" onclick="startCall()" title="Sesli Ara">📞</button>
+                    </div>
                 </div>
                 <div id="private-messages" class="messages-container"></div>
                 <div class="input-group">
+                    <button id="private-search-btn" class="icon-btn" onclick="openSearch()" disabled>🔍</button>
                     <label for="private-image-input" class="icon-btn">📷</label>
                     <input type="file" id="private-image-input" accept="image/*" style="display: none;" disabled>
                     <button id="private-record-btn" class="icon-btn" disabled>🎤</button>
@@ -65,6 +71,33 @@
                 </div>
             </div>
         </div>
+    </div>
+
+    <!-- Search Modal -->
+    <div id="modal-overlay" onclick="closeSearch()"></div>
+    <div id="search-modal">
+        <h3 style="margin-bottom: 15px; color: #fff;">İnternette Ara</h3>
+        <div class="input-group" style="border: none; padding: 0;">
+            <input type="text" id="search-query" placeholder="Ne aramak istersiniz?">
+            <button id="voice-search-btn" class="icon-btn" onclick="startVoiceSearch()" style="font-size: 18px; margin-right: 5px;">🎤</button>
+            <button class="send-btn" onclick="performSearch()">Ara</button>
+        </div>
+        <div id="search-results"></div>
+    </div>
+
+    <!-- Call UI -->
+    <div id="call-overlay" class="modal-overlay" style="display: none; flex-direction: column; justify-content: center; align-items: center; background: rgba(0,0,0,0.9); z-index: 1000;">
+        <div id="call-status" style="color: #fff; font-size: 24px; margin-bottom: 20px;">Aranıyor...</div>
+        <div id="caller-name" style="color: #fff; font-size: 32px; font-weight: 700; margin-bottom: 40px;">Kullanıcı</div>
+        <div id="incoming-call-actions" style="display: none; gap: 40px;">
+            <button onclick="acceptCall()" class="icon-btn" style="background: #4caf50; padding: 20px; border-radius: 50%; font-size: 32px;">📞</button>
+            <button onclick="rejectCall()" class="icon-btn" style="background: #f44336; padding: 20px; border-radius: 50%; font-size: 32px;">📵</button>
+        </div>
+        <div id="ongoing-call-actions" style="display: none;">
+            <button onclick="endCall()" class="icon-btn" style="background: #f44336; padding: 20px; border-radius: 50%; font-size: 32px;">📵</button>
+        </div>
+        <audio id="remote-audio" autoplay></audio>
+        <audio id="ringtone" src="https://assets.mixkit.co/active_storage/sfx/1359/1359-preview.mp3" loop></audio>
     </div>
 
     <script src="/socket.io/socket.io.js"></script>

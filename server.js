@@ -5,6 +5,7 @@ const Datastore = require('nedb-promises');
 const bcrypt = require('bcryptjs');
 const session = require('express-session');
 const path = require('path');
+const https = require('https');
 
 const app = express();
 const server = http.createServer(app);
@@ -64,6 +65,46 @@ app.get('/api/me', (req, res) => {
     } else {
         res.status(401).json({ error: 'Giriş yapılmadı' });
     }
+});
+
+app.get('/api/search', (req, res) => {
+    const query = req.query.q;
+    if (!query) return res.status(400).json({ error: 'Sorgu bulunamadı' });
+
+    // DuckDuckGo Instant Answer API (Ücretsiz ve Anahtar Gerekmez)
+    const url = `https://api.duckduckgo.com/?q=${encodeURIComponent(query)}&format=json&no_html=1&skip_disambig=1`;
+
+    https.get(url, (apiRes) => {
+        let data = '';
+        apiRes.on('data', (chunk) => data += chunk);
+        apiRes.on('end', () => {
+            try {
+                const result = JSON.parse(data);
+                const results = [];
+
+                if (result.AbstractText) {
+                    results.push({
+                        title: result.Heading || query,
+                        snippet: result.AbstractText,
+                        url: result.AbstractURL
+                    });
+                }
+
+                // Her durumda bir arama linki sunalım
+                results.push({
+                    title: `"${query}" için İnternet Araması`,
+                    snippet: 'Daha fazla sonuç için tıklayın.',
+                    url: `https://www.google.com/search?q=${encodeURIComponent(query)}`
+                });
+
+                res.json(results);
+            } catch (e) {
+                res.status(500).json({ error: 'Arama başarısız oldu' });
+            }
+        });
+    }).on('error', (err) => {
+        res.status(500).json({ error: 'Arama hatası' });
+    });
 });
 
 app.post('/api/logout', (req, res) => {
@@ -179,6 +220,41 @@ io.on('connection', (socket) => {
             ]
         }).sort({ timestamp: 1 });
         socket.emit('loadPrivateMessages', { otherUser, messages });
+    });
+
+    // WebRTC Signaling (Sesli Arama)
+    socket.on('callUser', (data) => {
+        const targetSocketId = [...activeUsers.entries()].find(([id, name]) => name === data.userToCall)?.[0];
+        if (targetSocketId) {
+            io.to(targetSocketId).emit('incomingCall', {
+                from: currentUser,
+                signal: data.signalData
+            });
+        }
+    });
+
+    socket.on('answerCall', (data) => {
+        const targetSocketId = [...activeUsers.entries()].find(([id, name]) => name === data.to)?.[0];
+        if (targetSocketId) {
+            io.to(targetSocketId).emit('callAccepted', data.signal);
+        }
+    });
+
+    socket.on('iceCandidate', (data) => {
+        const targetSocketId = [...activeUsers.entries()].find(([id, name]) => name === data.to)?.[0];
+        if (targetSocketId) {
+            io.to(targetSocketId).emit('iceCandidate', {
+                candidate: data.candidate,
+                from: currentUser
+            });
+        }
+    });
+
+    socket.on('endCall', (data) => {
+        const targetSocketId = [...activeUsers.entries()].find(([id, name]) => name === data.to)?.[0];
+        if (targetSocketId) {
+            io.to(targetSocketId).emit('callEnded');
+        }
     });
 
     socket.on('disconnect', () => {

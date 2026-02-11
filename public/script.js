@@ -4,6 +4,17 @@ let selectedUser = null;
 let mediaRecorder = null;
 let audioChunks = [];
 let unreadCounts = {}; // username -> count
+let localStream;
+let peerConnection;
+let incomingSignal;
+let currentCaller;
+
+const iceServers = {
+    iceServers: [
+        { urls: 'stun:stun.l.google.com:19302' },
+        { urls: 'stun:stun1.l.google.com:19302' }
+    ]
+};
 
 // Auth Functions
 function showRegister() {
@@ -146,6 +157,7 @@ function selectUser(user) {
     document.getElementById('private-btn').disabled = false;
     document.getElementById('private-image-input').disabled = false;
     document.getElementById('private-record-btn').disabled = false;
+    document.getElementById('private-search-btn').disabled = false;
     
     // UI Update
     document.querySelectorAll('#user-list li').forEach(li => {
@@ -164,6 +176,243 @@ function selectUser(user) {
     
     socket.emit('markAsSeen', user);
     socket.emit('loadPrivateMessages', user);
+    
+    // Call controls
+    document.getElementById('call-controls').style.display = 'block';
+}
+
+// WebRTC Functions
+async function startCall() {
+    if (!selectedUser) return;
+    
+    const overlay = document.getElementById('call-overlay');
+    const status = document.getElementById('call-status');
+    const name = document.getElementById('caller-name');
+    const ringtone = document.getElementById('ringtone');
+    
+    overlay.style.display = 'flex';
+    status.textContent = "Aranıyor...";
+    name.textContent = selectedUser;
+    document.getElementById('ongoing-call-actions').style.display = 'block';
+    ringtone.play();
+
+    try {
+        localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        peerConnection = createPeerConnection(selectedUser);
+        localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
+
+        const offer = await peerConnection.createOffer();
+        await peerConnection.setLocalDescription(offer);
+
+        socket.emit('callUser', {
+            userToCall: selectedUser,
+            signalData: offer
+        });
+    } catch (err) {
+        console.error("Arama başlatılamadı:", err);
+        endCall();
+    }
+}
+
+function createPeerConnection(targetUser) {
+    const pc = new RTCPeerConnection(iceServers);
+
+    pc.onicecandidate = (event) => {
+        if (event.candidate) {
+            socket.emit('iceCandidate', {
+                to: targetUser,
+                candidate: event.candidate
+            });
+        }
+    };
+
+    pc.ontrack = (event) => {
+        const remoteAudio = document.getElementById('remote-audio');
+        remoteAudio.srcObject = event.streams[0];
+    };
+
+    return pc;
+}
+
+socket.on('incomingCall', (data) => {
+    currentCaller = data.from;
+    incomingSignal = data.signal;
+
+    const overlay = document.getElementById('call-overlay');
+    const status = document.getElementById('call-status');
+    const name = document.getElementById('caller-name');
+    const actions = document.getElementById('incoming-call-actions');
+    const ringtone = document.getElementById('ringtone');
+
+    overlay.style.display = 'flex';
+    status.textContent = "Gelen Arama...";
+    name.textContent = currentCaller;
+    actions.style.display = 'flex';
+    ringtone.play();
+});
+
+async function acceptCall() {
+    const ringtone = document.getElementById('ringtone');
+    ringtone.pause();
+    ringtone.currentTime = 0;
+
+    document.getElementById('incoming-call-actions').style.display = 'none';
+    document.getElementById('ongoing-call-actions').style.display = 'block';
+    document.getElementById('call-status').textContent = "Görüşülüyor...";
+
+    try {
+        localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        peerConnection = createPeerConnection(currentCaller);
+        localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
+
+        await peerConnection.setRemoteDescription(new RTCSessionDescription(incomingSignal));
+        const answer = await peerConnection.createAnswer();
+        await peerConnection.setLocalDescription(answer);
+
+        socket.emit('answerCall', {
+            signal: answer,
+            to: currentCaller
+        });
+    } catch (err) {
+        console.error("Arama kabul edilemedi:", err);
+        endCall();
+    }
+}
+
+function rejectCall() {
+    socket.emit('endCall', { to: currentCaller });
+    endCall();
+}
+
+socket.on('callAccepted', async (signal) => {
+    const ringtone = document.getElementById('ringtone');
+    ringtone.pause();
+    ringtone.currentTime = 0;
+    
+    document.getElementById('call-status').textContent = "Görüşülüyor...";
+    await peerConnection.setRemoteDescription(new RTCSessionDescription(signal));
+});
+
+socket.on('iceCandidate', async (data) => {
+    if (peerConnection) {
+        try {
+            await peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate));
+        } catch (e) {
+            console.error("Error adding ice candidate", e);
+        }
+    }
+});
+
+socket.on('callEnded', () => {
+    endCall();
+});
+
+function endCall() {
+    const ringtone = document.getElementById('ringtone');
+    ringtone.pause();
+    ringtone.currentTime = 0;
+
+    if (peerConnection) {
+        peerConnection.close();
+        peerConnection = null;
+    }
+    if (localStream) {
+        localStream.getTracks().forEach(track => track.stop());
+        localStream = null;
+    }
+
+    if (selectedUser || currentCaller) {
+        socket.emit('endCall', { to: selectedUser || currentCaller });
+    }
+
+    document.getElementById('call-overlay').style.display = 'none';
+    document.getElementById('incoming-call-actions').style.display = 'none';
+    document.getElementById('ongoing-call-actions').style.display = 'none';
+    
+    currentCaller = null;
+    incomingSignal = null;
+}
+
+// Search Logic
+function openSearch() {
+    document.getElementById('modal-overlay').style.display = 'block';
+    document.getElementById('search-modal').style.display = 'block';
+    document.getElementById('search-query').focus();
+}
+
+function closeSearch() {
+    document.getElementById('modal-overlay').style.display = 'none';
+    document.getElementById('search-modal').style.display = 'none';
+    document.getElementById('search-results').innerHTML = '';
+    document.getElementById('search-query').value = '';
+}
+
+async function performSearch() {
+    const queryInput = document.getElementById('search-query');
+    const query = queryInput.value;
+    if (!query) return;
+
+    const resultsDiv = document.getElementById('search-results');
+    resultsDiv.innerHTML = '<p style="color: #fff;">Aranıyor...</p>';
+
+    try {
+        const response = await fetch(`/api/search?q=${encodeURIComponent(query)}`);
+        const results = await response.json();
+        
+        resultsDiv.innerHTML = '';
+        results.forEach(res => {
+            const item = document.createElement('div');
+            item.className = 'search-item';
+            item.innerHTML = `
+                <h4>${res.title}</h4>
+                <p>${res.snippet}</p>
+            `;
+            item.onclick = () => sendSearchResult(res);
+            resultsDiv.appendChild(item);
+        });
+    } catch (e) {
+        resultsDiv.innerHTML = '<p style="color: #ed4956;">Arama sırasında bir hata oluştu.</p>';
+    }
+}
+
+// Voice Search Logic
+function startVoiceSearch() {
+    const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+    const btn = document.getElementById('voice-search-btn');
+    const input = document.getElementById('search-query');
+
+    recognition.lang = 'tr-TR';
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
+
+    recognition.onstart = () => {
+        btn.classList.add('recording');
+        input.placeholder = "Dinleniyor...";
+    };
+
+    recognition.onresult = (event) => {
+        const transcript = event.results[0][0].transcript;
+        input.value = transcript;
+        input.placeholder = "Ne aramak istersiniz?";
+        performSearch(); // Otomatik ara
+    };
+
+    recognition.onerror = (event) => {
+        console.error('Speech recognition error', event.error);
+        input.placeholder = "Hata oluştu, tekrar deneyin.";
+    };
+
+    recognition.onend = () => {
+        btn.classList.remove('recording');
+    };
+
+    recognition.start();
+}
+
+function sendSearchResult(result) {
+    const text = `${result.title}\n${result.snippet}\n${result.url}`;
+    socket.emit('privateMessage', { to: selectedUser, text, type: 'text' });
+    closeSearch();
 }
 
 function sendCommon() {
@@ -201,7 +450,10 @@ function appendMessage(containerId, msg) {
     } else if (msg.type === 'audio') {
         contentHtml += `<audio controls src="${msg.content}"></audio>`;
     } else {
-        contentHtml += msg.text || (typeof msg === 'string' ? msg : ''); 
+        const text = msg.text || (typeof msg === 'string' ? msg : '');
+        // Basit URL dönüştürücü
+        const formattedText = text.replace(/(https?:\/\/[^\s]+)/g, '<a href="$1" target="_blank" style="color: #0095f6; text-decoration: none;">$1</a>').replace(/\n/g, '<br>');
+        contentHtml += formattedText; 
     }
 
     if (containerId === 'private-messages' && isSent) {
