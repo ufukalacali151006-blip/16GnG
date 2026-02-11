@@ -68,6 +68,11 @@ function initApp(username) {
     socket.emit('authenticate', username);
 }
 
+function toggleSidebar() {
+    const sidebar = document.querySelector('.sidebar');
+    sidebar.classList.toggle('hidden');
+}
+
 // Check session on load
 fetch('/api/me').then(res => res.json()).then(data => {
     if (data.username) initApp(data.username);
@@ -136,7 +141,7 @@ socket.on('loadPrivateMessages', ({ otherUser, messages }) => {
 function selectUser(user) {
     selectedUser = user;
     unreadCounts[user] = 0;
-    document.getElementById('private-header').textContent = `Özel Mesajlar: ${user}`;
+    document.getElementById('private-header').textContent = user;
     document.getElementById('private-input').disabled = false;
     document.getElementById('private-btn').disabled = false;
     document.getElementById('private-image-input').disabled = false;
@@ -151,6 +156,11 @@ function selectUser(user) {
             li.classList.remove('active');
         }
     });
+    
+    // Mobile: Hide sidebar when user selected
+    if (window.innerWidth <= 768) {
+        toggleSidebar();
+    }
     
     socket.emit('markAsSeen', user);
     socket.emit('loadPrivateMessages', user);

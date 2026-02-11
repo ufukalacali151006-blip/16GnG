@@ -38,25 +38,30 @@
         </div>
         <div class="chat-area">
             <div class="common-chat">
-                <div class="chat-header">Ortak Chat</div>
+                <div class="chat-header">
+                    <span>Ortak Chat</span>
+                </div>
                 <div id="common-messages" class="messages-container"></div>
                 <div class="input-group">
                     <label for="common-image-input" class="icon-btn">📷</label>
                     <input type="file" id="common-image-input" accept="image/*" style="display: none;">
                     <button id="common-record-btn" class="icon-btn">🎤</button>
                     <input type="text" id="common-input" placeholder="Mesaj yaz...">
-                    <button onclick="sendCommon()">Gönder</button>
+                    <button class="send-btn" onclick="sendCommon()">Gönder</button>
                 </div>
             </div>
             <div class="private-chat">
-                <div class="chat-header" id="private-header">Özel Mesajlar (Kullanıcı Seçin)</div>
+                <div class="chat-header">
+                    <button class="back-btn" onclick="toggleSidebar()">←</button>
+                    <span id="private-header">Özel Mesajlar</span>
+                </div>
                 <div id="private-messages" class="messages-container"></div>
                 <div class="input-group">
                     <label for="private-image-input" class="icon-btn">📷</label>
                     <input type="file" id="private-image-input" accept="image/*" style="display: none;" disabled>
                     <button id="private-record-btn" class="icon-btn" disabled>🎤</button>
                     <input type="text" id="private-input" placeholder="Mesaj yaz..." disabled>
-                    <button id="private-btn" onclick="sendPrivate()" disabled>Gönder</button>
+                    <button id="private-btn" class="send-btn" onclick="sendPrivate()" disabled>Gönder</button>
                 </div>
             </div>
         </div>
