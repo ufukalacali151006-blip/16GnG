@@ -163,10 +163,19 @@ io.on('connection', (socket) => {
     socket.on('loadPrivateMessages', async (otherUser) => {
         if (!currentUser) return;
         const messages = await messagesDB.find({
-            type: 'private',
-            $or: [
-                { from: currentUser, to: otherUser },
-                { from: otherUser, to: currentUser }
+            $and: [
+                { 
+                    $or: [
+                        { room: 'private' },
+                        { type: 'private' } // Eski mesajlar için uyumluluk
+                    ]
+                },
+                {
+                    $or: [
+                        { from: currentUser, to: otherUser },
+                        { from: otherUser, to: currentUser }
+                    ]
+                }
             ]
         }).sort({ timestamp: 1 });
         socket.emit('loadPrivateMessages', { otherUser, messages });
