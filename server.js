@@ -82,8 +82,13 @@ io.on('connection', (socket) => {
         // Aktif kullanıcı listesini güncelle
         io.emit('updateUserList', Array.from(new Set(activeUsers.values())));
         
-        // Geçmiş mesajları yükle (Sadece ortak chat için şimdilik)
-        messagesDB.find({ type: 'common' }).sort({ timestamp: 1 }).then(messages => {
+        // Geçmiş mesajları yükle (Ortak chat)
+        messagesDB.find({ 
+            $or: [
+                { room: 'common' },
+                { type: 'common' } // Eski mesajlar için uyumluluk
+            ]
+        }).sort({ timestamp: 1 }).then(messages => {
             socket.emit('loadCommonMessages', messages);
         });
     });
@@ -93,7 +98,7 @@ io.on('connection', (socket) => {
         if (!currentUser) return;
         let messageData = {
             from: currentUser,
-            type: msg.type || 'text',
+            room: 'common',
             timestamp: Date.now()
         };
 
@@ -115,6 +120,7 @@ io.on('connection', (socket) => {
         let messageData = {
             from: currentUser,
             to: msg.to,
+            room: 'private',
             timestamp: Date.now(),
             seen: false
         };
