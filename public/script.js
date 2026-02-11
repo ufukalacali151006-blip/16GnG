@@ -1,6 +1,8 @@
 const socket = io();
 let currentUser = null;
 let selectedUser = null;
+let mediaRecorder = null;
+let audioChunks = [];
 
 // Auth Functions
 function showRegister() {
@@ -114,6 +116,8 @@ function selectUser(user) {
     document.getElementById('private-header').textContent = `Özel Mesajlar: ${user}`;
     document.getElementById('private-input').disabled = false;
     document.getElementById('private-btn').disabled = false;
+    document.getElementById('private-image-input').disabled = false;
+    document.getElementById('private-record-btn').disabled = false;
     
     // UI Update
     document.querySelectorAll('#user-list li').forEach(li => {
@@ -148,15 +152,80 @@ function appendMessage(containerId, msg) {
     
     div.className = `message ${isSent ? 'sent' : 'received'}`;
     
+    let contentHtml = '';
     if (containerId === 'common-messages' && !isSent) {
-        div.innerHTML = `<span class="sender">${msg.from}</span>${msg.text}`;
+        contentHtml += `<span class="sender">${msg.from}</span>`;
+    }
+
+    if (msg.type === 'image') {
+        contentHtml += `<img src="${msg.content}" alt="Görsel">`;
+    } else if (msg.type === 'audio') {
+        contentHtml += `<audio controls src="${msg.content}"></audio>`;
     } else {
-        div.textContent = msg.text;
+        contentHtml += msg.text || msg; // msg.text fallback for old messages
     }
     
+    div.innerHTML = contentHtml;
     container.appendChild(div);
     container.scrollTop = container.scrollHeight;
 }
+
+// Image and Audio Handling
+async function handleImage(e, isPrivate = false) {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+        const base64 = event.target.result;
+        if (isPrivate) {
+            socket.emit('privateMessage', { to: selectedUser, content: base64, type: 'image' });
+        } else {
+            socket.emit('commonMessage', { content: base64, type: 'image' });
+        }
+    };
+    reader.readAsDataURL(file);
+}
+
+async function toggleRecord(isPrivate = false) {
+    const btnId = isPrivate ? 'private-record-btn' : 'common-record-btn';
+    const btn = document.getElementById(btnId);
+
+    if (mediaRecorder && mediaRecorder.state === 'recording') {
+        mediaRecorder.stop();
+        btn.classList.remove('recording');
+        return;
+    }
+
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    mediaRecorder = new MediaRecorder(stream);
+    audioChunks = [];
+
+    mediaRecorder.ondataavailable = (e) => audioChunks.push(e.data);
+    mediaRecorder.onstop = () => {
+        const blob = new Blob(audioChunks, { type: 'audio/ogg; codecs=opus' });
+        const reader = new FileReader();
+        reader.onload = (event) => {
+            const base64 = event.target.result;
+            if (isPrivate) {
+                socket.emit('privateMessage', { to: selectedUser, content: base64, type: 'audio' });
+            } else {
+                socket.emit('commonMessage', { content: base64, type: 'audio' });
+            }
+        };
+        reader.readAsDataURL(blob);
+        stream.getTracks().forEach(track => track.stop());
+    };
+
+    mediaRecorder.start();
+    btn.classList.add('recording');
+}
+
+// Event Listeners for new inputs
+document.getElementById('common-image-input').addEventListener('change', (e) => handleImage(e, false));
+document.getElementById('private-image-input').addEventListener('change', (e) => handleImage(e, true));
+document.getElementById('common-record-btn').addEventListener('click', () => toggleRecord(false));
+document.getElementById('private-record-btn').addEventListener('click', () => toggleRecord(true));
 
 // Enter key support
 document.getElementById('common-input')?.addEventListener('keypress', (e) => {

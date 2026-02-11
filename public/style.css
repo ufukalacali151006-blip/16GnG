@@ -211,6 +211,42 @@ body {
     cursor: pointer;
 }
 
+.icon-btn {
+    font-size: 20px;
+    cursor: pointer;
+    background: none;
+    border: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 5px;
+}
+
+.icon-btn:disabled {
+    opacity: 0.3;
+    cursor: default;
+}
+
+.message img {
+    max-width: 100%;
+    border-radius: 8px;
+    margin-top: 5px;
+}
+
+.message audio {
+    max-width: 100%;
+    margin-top: 5px;
+}
+
+.recording {
+    color: red !important;
+    animation: blink 1s infinite;
+}
+
+@keyframes blink {
+    50% { opacity: 0.5; }
+}
+
 .input-group button:disabled {
     color: #b2dffc;
 }

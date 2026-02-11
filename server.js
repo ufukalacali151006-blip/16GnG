@@ -91,30 +91,45 @@ io.on('connection', (socket) => {
     // Ortak Chat Mesajı
     socket.on('commonMessage', async (msg) => {
         if (!currentUser) return;
-        const messageData = {
+        let messageData = {
             from: currentUser,
-            text: msg,
-            type: 'common',
+            type: msg.type || 'text',
             timestamp: Date.now()
         };
+
+        if (msg.type === 'image' || msg.type === 'audio') {
+            messageData.content = msg.content;
+            messageData.type = msg.type;
+        } else {
+            messageData.text = typeof msg === 'string' ? msg : msg.text;
+            messageData.type = 'text';
+        }
+
         await messagesDB.insert(messageData);
         io.emit('commonMessage', messageData);
     });
 
     // Özel Mesaj
-    socket.on('privateMessage', async ({ to, text }) => {
+    socket.on('privateMessage', async (msg) => {
         if (!currentUser) return;
-        const messageData = {
+        let messageData = {
             from: currentUser,
-            to: to,
-            text: text,
-            type: 'private',
+            to: msg.to,
             timestamp: Date.now()
         };
+
+        if (msg.type === 'image' || msg.type === 'audio') {
+            messageData.content = msg.content;
+            messageData.type = msg.type;
+        } else {
+            messageData.text = msg.text;
+            messageData.type = 'text';
+        }
+
         await messagesDB.insert(messageData);
         
         // Alıcıya ve gönderene gönder
-        const recipientSocketId = [...activeUsers.entries()].find(([id, name]) => name === to)?.[0];
+        const recipientSocketId = [...activeUsers.entries()].find(([id, name]) => name === msg.to)?.[0];
         if (recipientSocketId) {
             io.to(recipientSocketId).emit('privateMessage', messageData);
         }
