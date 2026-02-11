@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>16GnG Chat</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="auth-container">
+        <div class="auth-box">
+            <h1>16GnG</h1>
+            <div id="login-form">
+                <input type="text" id="login-username" placeholder="Kullanıcı Adı">
+                <input type="password" id="login-password" placeholder="Şifre">
+                <button onclick="login()">Giriş Yap</button>
+                <p>Hesabın yok mu? <a href="#" onclick="showRegister()">Kaydol</a></p>
+            </div>
+            <div id="register-form" style="display: none;">
+                <input type="text" id="reg-username" placeholder="Kullanıcı Adı">
+                <input type="password" id="reg-password" placeholder="Şifre">
+                <button onclick="register()">Kaydol</button>
+                <p>Zaten hesabın var mı? <a href="#" onclick="showLogin()">Giriş Yap</a></p>
+            </div>
+        </div>
+    </div>
+
+    <div id="app-container" style="display: none;">
+        <div class="sidebar">
+            <div class="user-info">
+                <span id="my-username"></span>
+                <button onclick="logout()">Çıkış</button>
+            </div>
+            <h3>Aktif Kullanıcılar</h3>
+            <ul id="user-list">
+                <!-- Kullanıcılar buraya gelecek -->
+            </ul>
+        </div>
+        <div class="chat-area">
+            <div class="common-chat">
+                <div class="chat-header">Ortak Chat</div>
+                <div id="common-messages" class="messages-container"></div>
+                <div class="input-group">
+                    <input type="text" id="common-input" placeholder="Mesaj yaz...">
+                    <button onclick="sendCommon()">Gönder</button>
+                </div>
+            </div>
+            <div class="private-chat">
+                <div class="chat-header" id="private-header">Özel Mesajlar (Kullanıcı Seçin)</div>
+                <div id="private-messages" class="messages-container"></div>
+                <div class="input-group">
+                    <input type="text" id="private-input" placeholder="Mesaj yaz..." disabled>
+                    <button id="private-btn" onclick="sendPrivate()" disabled>Gönder</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>
