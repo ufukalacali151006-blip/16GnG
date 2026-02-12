@@ -123,8 +123,8 @@
         <div id="ongoing-call-actions" style="display: none;">
             <button onclick="endCall()" class="icon-btn" style="background: #f44336; padding: 20px; border-radius: 50%; font-size: 32px;">📵</button>
         </div>
-        <audio id="remote-audio" autoplay></audio>
-        <audio id="ringtone" src="https://assets.mixkit.co/active_storage/sfx/1359/1359-preview.mp3" loop></audio>
+        <audio id="remote-audio" autoplay playsinline></audio>
+        <audio id="ringtone" src="https://assets.mixkit.co/active_storage/sfx/1359/1359-preview.mp3" loop preload="auto"></audio>
     </div>
 
     <script src="/socket.io/socket.io.js"></script>

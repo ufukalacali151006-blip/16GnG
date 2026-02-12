@@ -12,7 +12,10 @@ let currentCaller;
 const iceServers = {
     iceServers: [
         { urls: 'stun:stun.l.google.com:19302' },
-        { urls: 'stun:stun1.l.google.com:19302' }
+        { urls: 'stun:stun1.l.google.com:19302' },
+        { urls: 'stun:stun2.l.google.com:19302' },
+        { urls: 'stun:stun3.l.google.com:19302' },
+        { urls: 'stun:stun4.l.google.com:19302' }
     ]
 };
 
@@ -218,6 +221,14 @@ function hideChatView() {
 async function startCall() {
     if (!selectedUser) return;
     
+    // Request permission early on mobile
+    try {
+        localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    } catch (err) {
+        alert("Mikrofon izni verilmedi!");
+        return;
+    }
+
     const overlay = document.getElementById('call-overlay');
     const status = document.getElementById('call-status');
     const name = document.getElementById('caller-name');
@@ -227,10 +238,9 @@ async function startCall() {
     status.textContent = "Aranıyor...";
     name.textContent = selectedUser;
     document.getElementById('ongoing-call-actions').style.display = 'block';
-    ringtone.play();
+    ringtone.play().catch(e => console.log("User interaction required for ringtone"));
 
     try {
-        localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
         peerConnection = createPeerConnection(selectedUser);
         localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
 
@@ -261,7 +271,11 @@ function createPeerConnection(targetUser) {
 
     pc.ontrack = (event) => {
         const remoteAudio = document.getElementById('remote-audio');
-        remoteAudio.srcObject = event.streams[0];
+        if (remoteAudio.srcObject !== event.streams[0]) {
+            remoteAudio.srcObject = event.streams[0];
+            // Mobile: Attempt to play immediately after attaching stream
+            remoteAudio.play().catch(e => console.error("Auto-play failed:", e));
+        }
     };
 
     return pc;
