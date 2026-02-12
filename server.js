@@ -250,6 +250,16 @@ io.on('connection', (socket) => {
         }
     });
 
+    socket.on('iceCandidate', (data) => {
+        const targetSocketId = [...activeUsers.entries()].find(([id, name]) => name === data.to)?.[0];
+        if (targetSocketId) {
+            io.to(targetSocketId).emit('iceCandidate', {
+                candidate: data.candidate,
+                from: currentUser
+            });
+        }
+    });
+
     socket.on('endCall', (data) => {
         const targetSocketId = [...activeUsers.entries()].find(([id, name]) => name === data.to)?.[0];
         if (targetSocketId) {

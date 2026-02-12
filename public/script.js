@@ -8,6 +8,7 @@ let localStream;
 let peerConnection;
 let incomingSignal;
 let currentCaller;
+let iceCandidateQueue = [];
 
 const iceServers = {
     iceServers: [
@@ -16,7 +17,8 @@ const iceServers = {
         { urls: 'stun:stun2.l.google.com:19302' },
         { urls: 'stun:stun3.l.google.com:19302' },
         { urls: 'stun:stun4.l.google.com:19302' }
-    ]
+    ],
+    iceCandidatePoolSize: 10
 };
 
 // Auth Functions
@@ -218,49 +220,15 @@ function hideChatView() {
 }
 
 // WebRTC Functions
-async function startCall() {
-    if (!selectedUser) return;
-    
-    // Request permission early on mobile
-    try {
-        localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    } catch (err) {
-        alert("Mikrofon izni verilmedi!");
-        return;
-    }
-
-    const overlay = document.getElementById('call-overlay');
-    const status = document.getElementById('call-status');
-    const name = document.getElementById('caller-name');
-    const ringtone = document.getElementById('ringtone');
-    
-    overlay.style.display = 'flex';
-    status.textContent = "Aranıyor...";
-    name.textContent = selectedUser;
-    document.getElementById('ongoing-call-actions').style.display = 'block';
-    ringtone.play().catch(e => console.log("User interaction required for ringtone"));
-
-    try {
-        peerConnection = createPeerConnection(selectedUser);
-        localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
-
-        const offer = await peerConnection.createOffer();
-        await peerConnection.setLocalDescription(offer);
-
-        socket.emit('callUser', {
-            userToCall: selectedUser,
-            signalData: offer
-        });
-    } catch (err) {
-        console.error("Arama başlatılamadı:", err);
-        endCall();
-    }
-}
-
 function createPeerConnection(targetUser) {
-    const pc = new RTCPeerConnection(iceServers);
+    if (peerConnection) {
+        peerConnection.close();
+    }
 
-    pc.onicecandidate = (event) => {
+    peerConnection = new RTCPeerConnection(iceServers);
+    iceCandidateQueue = [];
+
+    peerConnection.onicecandidate = (event) => {
         if (event.candidate) {
             socket.emit('iceCandidate', {
                 to: targetUser,
@@ -269,21 +237,77 @@ function createPeerConnection(targetUser) {
         }
     };
 
-    pc.ontrack = (event) => {
+    peerConnection.ontrack = (event) => {
         const remoteAudio = document.getElementById('remote-audio');
-        if (remoteAudio.srcObject !== event.streams[0]) {
+        console.log("Track received:", event.streams[0]);
+        if (event.streams && event.streams[0]) {
             remoteAudio.srcObject = event.streams[0];
-            // Mobile: Attempt to play immediately after attaching stream
-            remoteAudio.play().catch(e => console.error("Auto-play failed:", e));
+            
+            // Agresif oynatma denemesi
+            const playPromise = remoteAudio.play();
+            if (playPromise !== undefined) {
+                playPromise.catch(e => {
+                    console.log("Auto-play engellendi, etkileşim bekleniyor");
+                    document.body.addEventListener('click', () => {
+                        remoteAudio.play();
+                    }, { once: true });
+                });
+            }
         }
     };
 
-    return pc;
+    peerConnection.onconnectionstatechange = () => {
+        console.log("Bağlantı Durumu:", peerConnection.connectionState);
+        if (peerConnection.connectionState === 'connected') {
+            document.getElementById('call-status').textContent = "Bağlandı";
+        } else if (peerConnection.connectionState === 'failed' || peerConnection.connectionState === 'disconnected') {
+            endCall();
+        }
+    };
+
+    return peerConnection;
+}
+
+async function startCall() {
+    if (!selectedUser) return;
+    
+    try {
+        localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+        
+        const overlay = document.getElementById('call-overlay');
+        const status = document.getElementById('call-status');
+        const name = document.getElementById('caller-name');
+        const ringtone = document.getElementById('ringtone');
+        
+        overlay.style.display = 'flex';
+        status.textContent = "Aranıyor...";
+        name.textContent = selectedUser;
+        document.getElementById('ongoing-call-actions').style.display = 'block';
+        ringtone.play().catch(() => {});
+
+        peerConnection = createPeerConnection(selectedUser);
+        localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
+
+        const offer = await peerConnection.createOffer({
+            offerToReceiveAudio: 1
+        });
+        await peerConnection.setLocalDescription(offer);
+
+        socket.emit('callUser', {
+            userToCall: selectedUser,
+            signalData: offer
+        });
+    } catch (err) {
+        console.error("Arama başlatılamadı:", err);
+        alert("Mikrofon erişimi reddedildi veya cihaz bulunamadı.");
+        endCall();
+    }
 }
 
 socket.on('incomingCall', (data) => {
     currentCaller = data.from;
     incomingSignal = data.signal;
+    iceCandidateQueue = []; // Yeni arama için kuyruğu temizle
 
     const overlay = document.getElementById('call-overlay');
     const status = document.getElementById('call-status');
@@ -305,14 +329,21 @@ async function acceptCall() {
 
     document.getElementById('incoming-call-actions').style.display = 'none';
     document.getElementById('ongoing-call-actions').style.display = 'block';
-    document.getElementById('call-status').textContent = "Görüşülüyor...";
+    document.getElementById('call-status').textContent = "Bağlanıyor...";
 
     try {
-        localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
         peerConnection = createPeerConnection(currentCaller);
         localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
 
         await peerConnection.setRemoteDescription(new RTCSessionDescription(incomingSignal));
+        
+        // Kuyruktaki adayları işle
+        while (iceCandidateQueue.length > 0) {
+            const candidate = iceCandidateQueue.shift();
+            await peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
+        }
+
         const answer = await peerConnection.createAnswer();
         await peerConnection.setLocalDescription(answer);
 
@@ -337,16 +368,30 @@ socket.on('callAccepted', async (signal) => {
     ringtone.currentTime = 0;
     
     document.getElementById('call-status').textContent = "Görüşülüyor...";
-    await peerConnection.setRemoteDescription(new RTCSessionDescription(signal));
+    try {
+        if (peerConnection) {
+            await peerConnection.setRemoteDescription(new RTCSessionDescription(signal));
+            // Kuyruktaki adayları işle
+            while (iceCandidateQueue.length > 0) {
+                const candidate = iceCandidateQueue.shift();
+                await peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
+            }
+        }
+    } catch (err) {
+        console.error("Arama kabulü sırasında hata:", err);
+    }
 });
 
+// Socket events for WebRTC
 socket.on('iceCandidate', async (data) => {
-    if (peerConnection) {
-        try {
+    try {
+        if (peerConnection && peerConnection.remoteDescription && peerConnection.remoteDescription.type) {
             await peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate));
-        } catch (e) {
-            console.error("Error adding ice candidate", e);
+        } else {
+            iceCandidateQueue.push(data.candidate);
         }
+    } catch (e) {
+        console.error("ICE Candidate hatası:", e);
     }
 });
 
@@ -368,8 +413,9 @@ function endCall() {
         localStream = null;
     }
 
-    if (selectedUser || currentCaller) {
-        socket.emit('endCall', { to: selectedUser || currentCaller });
+    const target = selectedUser || currentCaller;
+    if (target) {
+        socket.emit('endCall', { to: target });
     }
 
     document.getElementById('call-overlay').style.display = 'none';
@@ -378,6 +424,7 @@ function endCall() {
     
     currentCaller = null;
     incomingSignal = null;
+    iceCandidateQueue = [];
 }
 
 // Search Logic
